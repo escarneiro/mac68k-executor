@@ -186,7 +186,7 @@ A2(PUBLIC, OSErr, SerStatus, INTEGER, rn, SerStaRec *, serstap)	/* IMII-253 */
 
 typedef struct {
     LONGINT fd;		/* will be the same for both In and Out */
-    struct termio state;
+    struct termios state;
 } hidden, *hiddenp;
 
 #else
@@ -377,7 +377,7 @@ A2(PUBLIC, OSErr, ROMlib_serialopen, ParmBlkPtr, pbp,		/* INTERNAL */
 		    err = HxX(h, fd);	/* error return piggybacked */
 		else {
 #if defined(TERMIO)
-		    err = ioctl(HxX(h, fd), TCGETA, &HxX(h, state)) < 0 ?
+		    err = tcgetattr(HxX(h, fd), &HxX(h, state)) < 0 ?
 						     ROMlib_maperrno() : noErr;
 #else
 		    if (ioctl(HxX(h, fd), TIOCGETP, &HxX(h, sgttyb)) < 0 ||
@@ -514,7 +514,7 @@ A2(PRIVATE, OSErr, serset, LONGINT, fd, INTEGER, param)
 
 
 #if defined(TERMIO)
-    struct termio settings;
+    struct termios settings;
 #else
     struct sgttyb sgttyb;
     struct tchars tchars;
@@ -631,7 +631,9 @@ A2(PRIVATE, OSErr, serset, LONGINT, fd, INTEGER, param)
 	settings.c_cflag = baud | csize | stopbits | parity;
 	settings.c_lflag = 0;
 	settings.c_line  = 0;	/* TODO: find out real value here */
-	err = ioctl(fd, TCSETAW, &settings) < 0 ? ROMlib_maperrno() : noErr;
+	cfsetospeed(&settings, baud);
+	cfsetispeed(&settings, baud);
+	err = tcsetattr(fd, TCSADRAIN, &settings) < 0 ? ROMlib_maperrno() : noErr;
 #else
 	sgttyb.sg_ispeed = sgttyb.sg_ospeed = baud;
 	sgttyb.sg_erase = -1;
@@ -675,7 +677,7 @@ A2(PRIVATE, OSErr, serxhshake, LONGINT, fd, SerShk *, sershkp)
 #else
 
 #if defined(TERMIO)
-    struct termio settings;
+    struct termios settings;
 #else
     struct sgttyb sgttyb;
     struct tchars tchars;
@@ -684,7 +686,7 @@ A2(PRIVATE, OSErr, serxhshake, LONGINT, fd, SerShk *, sershkp)
 
     err = noErr;
 #if defined(TERMIO)
-    if (ioctl(fd, TCGETA, &settings) < 0)
+    if (tcgetattr(fd, &settings) < 0)
 	err = ROMlib_maperrno();
 #else
     if (ioctl(fd, TIOCGETP, &sgttyb) < 0 || ioctl(fd, TIOCGETC, &tchars) < 0)
@@ -710,7 +712,7 @@ A2(PRIVATE, OSErr, serxhshake, LONGINT, fd, SerShk *, sershkp)
 	    settings.c_iflag |=  IXOFF;
 	} else
 	    settings.c_iflag &= ~IXOFF;
-	    err = ioctl(fd, TCSETAW, &settings) < 0 ? ROMlib_maperrno() : noErr;
+	    err = tcsetattr(fd, TCSADRAIN, &settings) < 0 ? ROMlib_maperrno() : noErr;
 #else
 	    /* Can't enable TANDEM without setting startc & stopc. If I
 	     * do that, input flow control is also enabled. This is what
@@ -741,7 +743,7 @@ A2(PRIVATE, OSErr, setbaud, LONGINT, fd, INTEGER, baud)
 #else
 
 #if defined(TERMIO)
-    struct termio settings;
+    struct termios settings;
 #else
     struct sgttyb sgttyb;
 #endif
@@ -757,7 +759,7 @@ A2(PRIVATE, OSErr, setbaud, LONGINT, fd, INTEGER, baud)
     if (*ip == 32767 || ip[0] - baud > baud - ip[-1])
 	--ip;
 #if defined(TERMIO)
-    if (ioctl(fd, TCGETA, &settings) < 0)
+    if (tcgetattr(fd, &settings) < 0)
 #else
     if (ioctl(fd, TIOCGETP, &sgttyb) < 0)
 #endif
@@ -766,7 +768,7 @@ A2(PRIVATE, OSErr, setbaud, LONGINT, fd, INTEGER, baud)
 #if defined(TERMIO)
 	settings.c_cflag &= ~CBAUD;
 	settings.c_cflag |= ip - rates + 1;
-	err = ioctl(fd, TCSETAW, &settings) < 0 ? ROMlib_maperrno() : noErr;
+	err = tcsetattr(fd, TCSADRAIN, &settings) < 0 ? ROMlib_maperrno() : noErr;
 #else
 	sgttyb.sg_ispeed = sgttyb.sg_ospeed = ip - rates + 1;
 	err = ioctl(fd, TIOCGETP, &sgttyb) < 0 ? ROMlib_maperrno() : noErr;
@@ -1005,7 +1007,7 @@ PRIVATE void restorecloseanddispose(hiddenh h)
 {
 #if defined (LINUX) || defined (NEXTSTEP)
 #if defined(TERMIO)
-    ioctl(HxX(h, fd), TCSETAW, &HxX(h, state));
+    tcsetattr(HxX(h, fd), TCSADRAIN, &HxX(h, state));
 #else
     ioctl(HxX(h, fd), TIOCSETP, &HxX(h, sgttyb));
     ioctl(HxX(h, fd), TIOCSETC, &HxX(h, tchars));

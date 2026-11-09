@@ -40,6 +40,12 @@ esac
 # Checks for programs.
 AM_PROG_AS
 AC_PROG_CC
+
+# This code predates C99 and depends on GNU89 semantics, notably "()" as an
+# unspecified parameter list and the GNU meaning of "extern inline".  Current
+# compilers default to a much newer dialect, where neither holds.
+CC="$CC -std=gnu89"
+
 AM_PROG_CC_C_O
 AC_PROG_RANLIB
 AM_PROG_AS
@@ -95,7 +101,7 @@ AC_ARG_WITH(sound,
             [sound_config="$withval"],
             [if test x"$ac_cv_lib_SDL_SDL_Init" = xyes; then
                sound_config=sdl
-             elif test x"$host_os" = xxlinux; then
+             elif test x"$host_os" = xlinux; then
                sound_config=linux
              elif test x$host_os = xmacosx; then
                sound_config=sdl
